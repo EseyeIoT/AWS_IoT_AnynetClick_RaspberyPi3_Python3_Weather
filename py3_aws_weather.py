@@ -1,66 +1,12 @@
 import time
-import serial
 import py3_weather_click as weather
+import py3_aws_click as aws
 
-# setup serial for AWS click
-ser = serial.Serial(
-    port='/dev/serial0',
-    baudrate=9600,
-    parity=serial.PARITY_NONE,
-    stopbits=serial.STOPBITS_ONE,
-    bytesize=serial.EIGHTBITS,
-    timeout=0.5,
-)
-
-ser.xonxoff = False
-ser.rtscts = False
-ser.dsrdtr = False
-
-reset = ser.readline()
-
-echooff = "ATE0\r\n"
-ok = "OK\r\n"
-pubclose = 'AT+AWSPUBCLOSE=0\r\n'
-pubopen = 'AT+AWSPUBOPEN=0,"WEATHER"\r\n'
-publish = "AT+AWSPUBLISH=0,%d\r\n"
-
-def recvdata(waitstr):
-    response = "".encode()
-
-    while waitstr.encode() not in response:
-        ch = ser.read()
-        response += ch
-
-
-def sendcmd(data):
-    ser.write(data.encode())
-
-def resetaws():
-    print("Resyncing with AWS please wait")
-    ser.timeout = 0.01
-    for i in range(1,50):
-        idx = 0
-        sendcmd(echooff)
-        response = "".encode()
-        while ok.encode() not in response:
-            idx += 1
-            ch = ser.read()
-            response += ch
-            if idx == 20:
-                break
-        if ok.encode() in response:
-            break
-    ser.timeout = 2
 
 def setup():
-    resetaws()
+    aws.resetaws()
 
-    sendcmd(echooff)
-    recvdata(ok)
-    sendcmd(pubclose)
-    recvdata(ok)
-    sendcmd(pubopen)
-    recvdata(ok)
+    aws.setup()
     print("AWS  open")
     
     weather.setup()
@@ -73,12 +19,12 @@ def run():
         jsonmsg = weather.getdata(jsonmsg)
 
         # send data length
-        sendcmd(publish % len(jsonmsg))
-        recvdata('>')    
+        aws.sendcmd(aws.publish % len(jsonmsg))
+        aws.recvdata('>')    
 
         # send data
-        sendcmd(jsonmsg)
-        recvdata(ok)
+        aws.sendcmd(jsonmsg)
+        aws.recvdata(aws.ok)
 
         # wait for time to send next message
         time.sleep(30)
